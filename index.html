@@ -3,620 +3,878 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Janela perfeita do Claude Code — gerador de cron</title>
-<meta name="description" content="Calcule o cron ideal pra maximizar suas janelas de 5h do Claude Code. Lógica determinística, sem IA, sem rastreio.">
-<meta property="og:title" content="Janela perfeita do Claude Code">
-<meta property="og:description" content="Gere a linha de cron ideal pra maximizar suas janelas de 5h.">
+<title>claude-crounde — gerador de cron pra janela de 5h do Claude Code</title>
+<meta name="description" content="Ferramenta determinística que gera a linha de cron ideal pra empurrar o reset da janela de 5h do Claude Code pra dentro do seu expediente. Sem IA, sem rastreio, código aberto.">
+<meta property="og:title" content="claude-crounde">
+<meta property="og:description" content="Empurre o reset da janela de 5h do Claude Code pra dentro do expediente. Gerador de cron determinístico.">
 <meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23f1ede2'/%3E%3Ctext x='32' y='44' font-family='Georgia,serif' font-size='40' text-anchor='middle' fill='%23c95d2c' font-weight='700'%3E%E2%97%B7%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0f0f13;
-    --bg-elev: #16161e;
-    --border: #1e1e2a;
-    --text: #e1e1e6;
-    --text-dim: #8b8b95;
-    --accent: #7c6af7;
-    --accent-dim: rgba(124, 106, 247, 0.18);
-    --accent-soft: rgba(124, 106, 247, 0.08);
-    --warn: #f5a623;
-    --warn-soft: rgba(245, 166, 35, 0.15);
-    --ok: #4ade80;
+    --paper:       oklch(96% 0.012 80);
+    --paper-edge:  oklch(92% 0.018 75);
+    --ink:         oklch(22% 0.025 50);
+    --ink-soft:    oklch(45% 0.025 50);
+    --ink-faint:   oklch(62% 0.020 55);
+    --rule:        oklch(82% 0.015 70);
+    --accent:      oklch(55% 0.15 40);
+    --accent-deep: oklch(42% 0.14 38);
+    --accent-soft: oklch(88% 0.05 40);
+
+    --measure: 68ch;
+    --col-max: 720px;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html { scroll-behavior: smooth; }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
   body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    line-height: 1.6;
-    min-height: 100vh;
-    padding: 24px 16px 48px;
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Source Serif 4', Georgia, 'Iowan Old Style', serif;
+    font-size: clamp(16px, 0.92rem + 0.25vw, 18px);
+    line-height: 1.55;
+    font-feature-settings: "kern", "liga", "onum";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
-  .container { max-width: 880px; margin: 0 auto; }
-  .hero { text-align: center; padding: 40px 0 36px; }
-  .hero .emoji { font-size: 56px; display: block; margin-bottom: 12px; }
-  .hero h1 {
-    font-size: clamp(28px, 5vw, 40px);
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    margin-bottom: 10px;
-  }
-  .hero p {
-    color: var(--text-dim);
-    font-size: 17px;
-    max-width: 560px;
+  ::selection { background: var(--accent-soft); color: var(--ink); }
+
+  /* ---------- frame ---------- */
+  .frame {
+    max-width: var(--col-max);
     margin: 0 auto;
+    padding: clamp(28px, 5vw, 56px) clamp(20px, 4vw, 40px) 64px;
   }
-  .card {
-    background: var(--bg-elev);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 28px;
-    margin-bottom: 20px;
+
+  /* ---------- masthead ---------- */
+  .masthead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: clamp(40px, 7vw, 72px);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
   }
-  .card h2 {
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 18px;
+  .masthead .left { display: flex; gap: 14px; align-items: baseline; }
+  .masthead .left .mark { color: var(--accent); font-weight: 600; font-size: 14px; }
+  .masthead .right { text-align: right; }
+  .masthead a { color: inherit; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color .15s; }
+  .masthead a:hover { border-color: var(--ink-soft); }
+  @media (max-width: 520px) { .masthead .right .hide-tight { display: none; } }
+
+  /* ---------- hero ---------- */
+  .hero { margin-bottom: clamp(40px, 7vw, 72px); }
+
+  .hero .kicker {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-faint);
+    margin-bottom: 14px;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
   }
-  .card h2 .badge {
-    background: var(--accent-dim);
-    color: var(--accent);
-    font-size: 11px;
-    padding: 3px 8px;
-    border-radius: 6px;
-    font-weight: 500;
-    letter-spacing: 0.02em;
+  .hero .kicker::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
   }
-  .input-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    margin-bottom: 20px;
-  }
-  @media (max-width: 480px) {
-    .input-row { grid-template-columns: 1fr; }
-  }
-  .input-group label {
-    display: block;
-    font-size: 13px;
-    color: var(--text-dim);
-    margin-bottom: 6px;
-    font-weight: 500;
-  }
-  .input-group input[type="time"] {
-    width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 12px 14px;
-    border-radius: 8px;
-    font-size: 16px;
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 500;
-    transition: border-color 0.15s;
-  }
-  .input-group input[type="time"]:focus {
-    outline: none;
-    border-color: var(--accent);
-  }
-  .input-group input[type="time"]::-webkit-calendar-picker-indicator {
-    filter: invert(0.8);
-    cursor: pointer;
-  }
-  button.primary {
-    width: 100%;
-    background: var(--accent);
-    color: white;
-    border: none;
-    padding: 14px 18px;
-    border-radius: 8px;
-    font-size: 15px;
+
+  h1.hero-title {
+    font-family: 'Source Serif 4', Georgia, serif;
     font-weight: 600;
-    cursor: pointer;
-    transition: background 0.15s, transform 0.05s;
-    font-family: inherit;
+    font-size: clamp(28px, 4.4vw + 4px, 52px);
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    margin: 0 0 22px;
+    max-width: 18ch;
+    font-variation-settings: "opsz" 48;
   }
-  button.primary:hover { background: #6b58e6; }
-  button.primary:active { transform: scale(0.99); }
-
-  /* Resultado */
-  #resultado { display: none; }
-  #resultado.show { display: block; }
-
-  .warmup-display {
-    text-align: center;
-    padding: 24px 0;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 24px;
-  }
-  .warmup-display .label {
-    font-size: 13px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-bottom: 8px;
-  }
-  .warmup-display .time {
-    font-size: 56px;
-    font-weight: 700;
-    font-family: 'JetBrains Mono', monospace;
+  h1.hero-title em {
+    font-style: italic;
+    font-weight: 400;
     color: var(--accent);
-    letter-spacing: -0.02em;
-    line-height: 1;
-  }
-  .warmup-display .sub {
-    margin-top: 8px;
-    font-size: 14px;
-    color: var(--text-dim);
   }
 
-  .code-block {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px 16px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    color: var(--text);
-    overflow-x: auto;
+  .hero-lede {
+    max-width: var(--measure);
+    color: var(--ink-soft);
+    font-size: clamp(16px, 0.9rem + 0.3vw, 19px);
+    line-height: 1.6;
+    margin: 0;
+  }
+  .hero-lede strong { color: var(--ink); font-weight: 600; }
+  .hero-lede code, .prose code {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.86em;
+    background: var(--accent-soft);
+    color: var(--ink);
+    padding: 1px 6px;
+    border-radius: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- output panel ---------- */
+  .output {
+    margin: clamp(28px, 5vw, 48px) 0 clamp(40px, 7vw, 64px);
+    border-top: 2px solid var(--ink);
+    border-bottom: 1px solid var(--rule);
+    padding: clamp(20px, 3vw, 28px) 0 clamp(24px, 3vw, 32px);
     position: relative;
+  }
+
+  .output-meta {
+    display: flex;
+    gap: 28px;
+    flex-wrap: wrap;
+    align-items: baseline;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-faint);
+    margin: 0 0 20px;
+  }
+  .output-meta div { display: flex; gap: 8px; white-space: nowrap; }
+  .output-meta dt { margin: 0; }
+  .output-meta dd { margin: 0; color: var(--ink-soft); }
+  .output-meta dd b { color: var(--ink); font-weight: 600; }
+
+  .cron-stage {
+    position: relative;
+    padding: 4px 0;
+  }
+
+  .cron-line {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: clamp(13px, 0.7rem + 0.7vw, 17px);
+    font-weight: 500;
+    line-height: 1.55;
+    color: var(--ink);
     word-break: break-all;
-    margin-bottom: 16px;
+    padding: 4px 92px 4px 0;
+    margin: 0;
+    user-select: all;
+    white-space: pre-wrap;
   }
-  .code-block .copy-btn {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    background: var(--border);
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 12px;
-    cursor: pointer;
-    font-family: inherit;
-    transition: all 0.15s;
-  }
-  .code-block .copy-btn:hover {
-    background: var(--accent);
-    color: white;
-    border-color: var(--accent);
-  }
-  .code-block .copy-btn.ok { background: var(--ok); color: #0f0f13; border-color: var(--ok); }
-  .code-block .content { padding-right: 70px; }
+  .cron-line .field { color: var(--accent); font-weight: 600; }
+  .cron-line .path { color: var(--ink-soft); }
+  .cron-line .arg { color: var(--ink-soft); }
 
-  .label-line {
-    font-size: 13px;
-    color: var(--text-dim);
-    margin-bottom: 6px;
-    font-weight: 500;
-  }
-
-  /* Timeline */
-  .timeline-wrapper {
-    margin: 28px 0 16px;
-  }
-  .timeline-title {
-    font-size: 14px;
-    color: var(--text-dim);
-    margin-bottom: 12px;
-    font-weight: 500;
-  }
-  .timeline {
-    position: relative;
-    height: 90px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0;
-    overflow: hidden;
-  }
-  .timeline .hour-marks {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-  }
-  .timeline .hour-mark {
+  .copy-btn {
     position: absolute;
     top: 0;
-    bottom: 0;
-    width: 1px;
-    background: var(--border);
-  }
-  .timeline .hour-label {
-    position: absolute;
-    bottom: 4px;
-    font-size: 10px;
-    color: var(--text-dim);
-    font-family: 'JetBrains Mono', monospace;
-    transform: translateX(-50%);
-  }
-  .timeline .window-bar {
-    position: absolute;
-    top: 16px;
-    height: 30px;
-    background: var(--accent-dim);
-    border: 1px solid var(--accent);
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 10px;
-    font-family: 'JetBrains Mono', monospace;
-    color: var(--accent);
+    right: 0;
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--ink);
+    border-radius: 0;
+    padding: 7px 14px 8px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
     font-weight: 600;
-    overflow: hidden;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: background .12s ease, color .12s ease, transform .08s ease;
   }
-  .timeline .work-bar {
-    position: absolute;
-    top: 50px;
-    height: 18px;
-    background: var(--warn-soft);
-    border: 1px solid var(--warn);
-    border-radius: 4px;
-  }
-  .legend {
-    display: flex;
-    gap: 20px;
-    margin-top: 14px;
-    font-size: 12px;
-    color: var(--text-dim);
-    flex-wrap: wrap;
-  }
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .legend-swatch {
-    width: 14px;
-    height: 10px;
-    border-radius: 2px;
-    border: 1px solid;
-  }
-  .legend-swatch.win { background: var(--accent-dim); border-color: var(--accent); }
-  .legend-swatch.work { background: var(--warn-soft); border-color: var(--warn); }
+  .copy-btn:hover { background: var(--ink); color: var(--paper); }
+  .copy-btn:active { transform: translateY(1px); }
+  .copy-btn.ok { background: var(--accent); color: var(--paper); border-color: var(--accent); }
 
-  .summary {
-    background: var(--accent-soft);
-    border: 1px solid var(--accent-dim);
-    border-radius: 8px;
-    padding: 14px 16px;
+  .output-note {
+    margin: 18px 0 0;
+    color: var(--ink-soft);
     font-size: 14px;
-    color: var(--text);
-    margin-top: 20px;
+    max-width: var(--measure);
+    line-height: 1.55;
   }
-  .summary strong { color: var(--accent); font-weight: 600; }
-
-  .warn-card {
-    background: var(--warn-soft);
-    border: 1px solid var(--warn);
-    border-radius: 8px;
-    padding: 16px 18px;
-    color: var(--text);
-    margin-bottom: 16px;
-  }
-  .warn-card .icon { color: var(--warn); font-weight: 700; }
-
-  /* Explicação */
-  .explain p { color: var(--text-dim); font-size: 14px; margin-bottom: 12px; }
-  .explain ul { padding-left: 20px; margin-bottom: 14px; }
-  .explain li { color: var(--text-dim); font-size: 14px; margin-bottom: 6px; }
-  .explain h3 {
-    font-size: 15px;
+  .output-note .num {
+    color: var(--accent);
     font-weight: 600;
-    color: var(--text);
-    margin: 20px 0 10px;
+    font-variant-numeric: tabular-nums;
   }
-  .explain h3:first-child { margin-top: 0; }
-  .explain code {
-    background: var(--bg);
-    color: var(--accent);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-  }
-  .explain .inline-warn { color: var(--warn); }
 
-  footer {
-    text-align: center;
-    margin-top: 40px;
-    padding-top: 24px;
-    border-top: 1px solid var(--border);
-    color: var(--text-dim);
-    font-size: 13px;
+  /* alternate output state — no warmup needed */
+  .output.no-warmup .cron-line,
+  .output.no-warmup .copy-btn { display: none; }
+  .no-warmup-msg {
+    display: none;
+    font-family: 'Source Serif 4', serif;
+    font-size: 18px;
+    color: var(--ink);
+    margin: 0;
+    padding: 4px 0;
   }
-  footer a {
+  .output.no-warmup .no-warmup-msg { display: block; }
+  .no-warmup-msg b { color: var(--accent); }
+
+  /* ---------- controls ---------- */
+  .controls {
+    margin-bottom: clamp(48px, 7vw, 80px);
+  }
+  .controls h2 {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 600;
+    color: var(--ink-faint);
+    margin: 0 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .controls h2 .num { color: var(--accent); font-weight: 600; }
+  .controls h2::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+  }
+
+  .field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 14px 22px;
+    align-items: end;
+    max-width: 540px;
+  }
+  @media (max-width: 520px) {
+    .field-grid { grid-template-columns: 1fr 1fr; }
+    .field-grid .submit { grid-column: 1 / -1; }
+  }
+
+  .field label {
+    display: block;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-faint);
+    margin-bottom: 6px;
+  }
+  .field input[type="time"] {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid var(--ink);
+    border-radius: 0;
+    padding: 6px 0 8px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: clamp(18px, 0.9rem + 0.5vw, 22px);
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .field input[type="time"]:focus {
+    outline: none;
+    border-bottom-color: var(--accent);
+  }
+  .field input[type="time"]::-webkit-calendar-picker-indicator {
+    opacity: 0.4;
+    cursor: pointer;
+    margin-left: 8px;
+  }
+  .field input[type="time"]::-webkit-calendar-picker-indicator:hover { opacity: 0.8; }
+
+  .submit button {
+    background: var(--ink);
+    color: var(--paper);
+    border: 1.5px solid var(--ink);
+    border-radius: 0;
+    padding: 11px 18px 12px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: background .12s ease, border-color .12s ease;
+    white-space: nowrap;
+  }
+  .submit button:hover { background: var(--accent); border-color: var(--accent); }
+  .submit button:active { transform: translateY(1px); }
+
+  /* ---------- figure (timeline) ---------- */
+  figure.diagram {
+    margin: 0 0 clamp(40px, 6vw, 64px);
+    padding: 0;
+  }
+  figure.diagram h2 {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 600;
+    color: var(--ink-faint);
+    margin: 0 0 26px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  figure.diagram h2 .num { color: var(--accent); font-weight: 600; }
+  figure.diagram h2::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+  }
+
+  .diagram-svg-wrap {
+    width: 100%;
+    overflow: visible;
+  }
+  .diagram-svg-wrap svg { display: block; width: 100%; height: auto; max-height: 220px; }
+
+  /* SVG element styles via CSS so they pick up tokens */
+  .axis-line     { stroke: oklch(22% 0.025 50); stroke-width: 1; }
+  .axis-tick     { stroke: oklch(22% 0.025 50); stroke-width: 1; }
+  .axis-tick-min { stroke: oklch(62% 0.020 55); stroke-width: 0.5; }
+  .axis-label {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    fill: oklch(45% 0.025 50);
+    font-variant-numeric: tabular-nums;
+  }
+  .window-band {
+    fill: oklch(55% 0.15 40);
+    fill-opacity: 0.10;
+    stroke: oklch(55% 0.15 40);
+    stroke-width: 1;
+  }
+  .window-band.future {
+    fill-opacity: 0.03;
+    stroke-dasharray: 3 2;
+    stroke-opacity: 0.55;
+  }
+  .window-label {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    fill: oklch(42% 0.14 38);
+    font-weight: 600;
+    text-anchor: middle;
+    letter-spacing: 0.05em;
+  }
+  .window-label.future { fill-opacity: 0.55; }
+  .work-band {
+    fill: none;
+    stroke: oklch(22% 0.025 50);
+    stroke-width: 1.2;
+  }
+  .work-label {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+    fill: oklch(22% 0.025 50);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+  .reset-marker line { stroke: oklch(42% 0.14 38); stroke-width: 1; stroke-dasharray: 1.5 2; }
+  .reset-marker text {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 9px;
+    fill: oklch(42% 0.14 38);
+    text-anchor: middle;
+    letter-spacing: 0.04em;
+  }
+  .warmup-marker line { stroke: oklch(42% 0.14 38); stroke-width: 1.2; stroke-dasharray: 2 2; }
+  .warmup-marker text {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    fill: oklch(42% 0.14 38);
+    text-anchor: middle;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+
+  figcaption {
+    font-family: 'Source Serif 4', serif;
+    font-style: italic;
+    font-size: 14.5px;
+    color: var(--ink-soft);
+    margin-top: 18px;
+    max-width: var(--measure);
+    line-height: 1.55;
+  }
+  figcaption b { font-style: normal; font-weight: 600; color: var(--ink); }
+
+  /* ---------- prose ---------- */
+  .prose {
+    max-width: var(--measure);
+  }
+  .prose section { margin-bottom: clamp(28px, 4vw, 40px); }
+  .prose section:last-child { margin-bottom: 0; }
+
+  .prose h2 {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 600;
+    color: var(--ink-faint);
+    margin: 0 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .prose h2 .num { color: var(--accent); font-weight: 600; }
+  .prose h2::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+  }
+
+  .prose h3 {
+    font-family: 'Source Serif 4', serif;
+    font-size: clamp(20px, 0.9rem + 0.6vw, 24px);
+    font-weight: 600;
+    margin: 0 0 10px;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+  }
+  .prose h3 em { font-style: italic; color: var(--accent); font-weight: 500; }
+
+  .prose p {
+    margin: 0 0 14px;
+    color: var(--ink);
+    line-height: 1.65;
+    hyphens: auto;
+  }
+  .prose p:last-child { margin-bottom: 0; }
+
+  .prose ol.tradeoffs {
+    list-style: none;
+    counter-reset: trade;
+    padding: 0;
+    margin: 12px 0 0;
+  }
+  .prose ol.tradeoffs li {
+    counter-increment: trade;
+    position: relative;
+    padding-left: 42px;
+    margin-bottom: 16px;
+    line-height: 1.6;
+  }
+  .prose ol.tradeoffs li::before {
+    content: counter(trade, decimal-leading-zero);
+    position: absolute;
+    left: 0;
+    top: 2px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px;
+    font-weight: 600;
     color: var(--accent);
-    text-decoration: none;
-    font-weight: 500;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
   }
-  footer a:hover { text-decoration: underline; }
+  .prose ol.tradeoffs li b { font-weight: 600; color: var(--ink); }
+
+  .formula {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 15px;
+    background: transparent;
+    border-top: 1px dashed var(--rule);
+    border-bottom: 1px dashed var(--rule);
+    padding: 16px 0;
+    margin: 18px 0;
+    text-align: center;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .formula b { color: var(--accent); font-weight: 600; }
+
+  /* ---------- footer ---------- */
+  footer.colophon {
+    margin-top: clamp(56px, 9vw, 96px);
+    padding-top: 22px;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    flex-wrap: wrap;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+  }
+  footer.colophon a {
+    color: var(--ink);
+    text-decoration: none;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 1px;
+    transition: border-color .15s, color .15s;
+  }
+  footer.colophon a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+  footer.colophon .right { display: flex; gap: 22px; flex-wrap: wrap; }
+
+  /* ---------- fine motion ---------- */
+  @media (prefers-reduced-motion: no-preference) {
+    .cron-line.flash { animation: flash .55s cubic-bezier(0.22, 1, 0.36, 1); }
+    @keyframes flash {
+      0%   { background: var(--accent-soft); }
+      100% { background: transparent; }
+    }
+  }
+
+  @media print {
+    body { background: #fff; color: #000; }
+    .copy-btn, .submit, .masthead, .field input { display: none; }
+  }
 </style>
 </head>
 <body>
-<div class="container">
 
-  <div class="hero">
-    <span class="emoji">🪟</span>
-    <h1>Janela perfeita do Claude Code</h1>
-    <p>Descubra o horário exato pra "acender" o cron e ter <strong style="color:var(--text)">até 3 janelas frescas</strong> de 5h durante o seu expediente.</p>
-  </div>
+<div class="frame">
 
-  <div class="card">
-    <h2>Seu horário de trabalho <span class="badge">passo 1</span></h2>
-    <div class="input-row">
-      <div class="input-group">
-        <label for="start">Início</label>
-        <input type="time" id="start" value="09:00">
+  <header class="masthead">
+    <div class="left">
+      <span class="mark">◷</span>
+      <span>claude-crounde<span class="hide-tight"> / v1</span></span>
+    </div>
+    <div class="right">
+      <a href="https://github.com/ramonmatosweb/claude-crounde" target="_blank" rel="noopener">github · ramonmatosweb<span class="hide-tight">/claude-crounde</span></a>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="kicker">Janela 5h · Claude Code</div>
+    <h1 class="hero-title">Empurre o <em>reset</em> da janela pra dentro do seu expediente.</h1>
+    <p class="hero-lede">
+      O Claude Code conta uma janela rotativa de 5h a partir da sua primeira mensagem do dia. Quem bate o limite no meio do expediente perde horas esperando o reset. Esta ferramenta calcula a linha de cron que dispara um <code>ping</code> antes de você começar, fazendo o reset cair <strong>durante</strong> o trabalho. Até três janelas frescas no mesmo dia.
+    </p>
+  </section>
+
+  <section class="output" id="output" aria-live="polite">
+    <dl class="output-meta">
+      <div><dt>Expediente</dt><dd><b id="m-start">09:00</b>—<b id="m-end">18:00</b></dd></div>
+      <div><dt>Warmup</dt><dd><b id="m-warmup">05:00</b></dd></div>
+      <div><dt>Janelas no dia</dt><dd><b id="m-windows">3</b></dd></div>
+    </dl>
+
+    <div class="cron-stage">
+      <pre class="cron-line" id="cron-line"><span class="field">0 5 * * 1-5</span> <span class="path">/usr/local/bin/claude</span> <span class="arg">-p "ping" --output-format json &gt; /tmp/claude_warmup.log 2&gt;&amp;1</span></pre>
+      <button class="copy-btn" id="copy-btn" type="button" aria-label="Copiar linha de cron">Copiar</button>
+    </div>
+
+    <p class="no-warmup-msg" id="no-warmup-msg">
+      Sua jornada cabe em uma janela só. <b>Warmup não traz ganho</b>: é só começar a trabalhar.
+    </p>
+
+    <p class="output-note" id="output-note">
+      Cobertura: <span class="num" id="m-coverage">1h + 5h + 3h</span> dentro do expediente. Ajuste o path se o seu <code>claude</code> não estiver em <code>/usr/local/bin</code> (descubra com <code>which claude</code>).
+    </p>
+  </section>
+
+  <section class="controls">
+    <h2><span class="num">§ 1</span> Recalcular</h2>
+    <div class="field-grid">
+      <div class="field">
+        <label for="start">Início do expediente</label>
+        <input type="time" id="start" value="09:00" step="900">
       </div>
-      <div class="input-group">
-        <label for="end">Fim</label>
-        <input type="time" id="end" value="18:00">
+      <div class="field">
+        <label for="end">Fim do expediente</label>
+        <input type="time" id="end" value="18:00" step="900">
+      </div>
+      <div class="submit">
+        <button id="calcular" type="button">Calcular</button>
       </div>
     </div>
-    <button class="primary" id="calcular">Calcular janela ideal</button>
-  </div>
+  </section>
 
-  <div class="card" id="resultado">
-    <h2>Resultado <span class="badge">passo 2</span></h2>
+  <figure class="diagram">
+    <h2><span class="num">§ 2</span> Diagrama</h2>
+    <div class="diagram-svg-wrap" id="diagram-wrap"></div>
+    <figcaption>
+      <b>Figura 1.</b> Sobreposição das janelas Claude Code (5h cada) com o expediente. O warmup às <b id="cap-warmup">05:00</b> faz os resets caírem dentro do horário de trabalho, abrindo <b id="cap-windows">três</b> janelas frescas no mesmo dia.
+    </figcaption>
+  </figure>
 
-    <div id="result-content"></div>
-  </div>
+  <article class="prose">
 
-  <div class="card explain">
-    <h2>Como funciona <span class="badge">teoria</span></h2>
-    <h3>A janela de 5h</h3>
-    <p>O Claude Code conta uma <strong>janela rotativa de 5 horas</strong> a partir da sua primeira mensagem do dia. Toda mensagem nesse intervalo consome a mesma cota. Quando a janela acaba, uma nova começa na próxima mensagem.</p>
-    <p>Se você começa às 09h sem warmup, sua janela 1 vai de <code>09h-14h</code> e a janela 2 de <code>14h-19h</code>. No expediente típico (9h-18h) você acessa <strong>2 janelas</strong>, mas a segunda só usa 4h dos 5h disponíveis.</p>
+    <section>
+      <h2><span class="num">§ 3</span> A janela</h2>
+      <h3>Cinco horas, a partir da primeira mensagem.</h3>
+      <p>
+        Toda mensagem dentro desse intervalo consome a mesma cota. Quando as 5 horas acabam, uma nova janela só começa quando você manda a próxima mensagem, não automaticamente. Isso quer dizer que <em>o reset acompanha o seu horário</em>: se você começa às 09h, o reset cai às 14h. Se começa às 10h, cai às 15h.
+      </p>
+      <p>
+        Pra quem bate o teto da janela antes das 5h, o problema é claro. O reset cai sempre no mesmo trecho do dia. Quem começa cedo perde tarde; quem começa tarde perde noite.
+      </p>
+    </section>
 
-    <h3>Por que warmup ajuda</h3>
-    <p>Mandando uma única mensagem de <code>ping</code> automaticamente <strong>antes do seu expediente</strong>, você desloca o ciclo de resets pra dentro do horário de trabalho. Resultado: o reset acontece <em>durante</em> o expediente, te dando uma cota nova no meio do dia.</p>
-    <p>A regra simples é <code>warmup = início_do_trabalho − 4h</code>. Isso faz a primeira janela resetar 1h depois de você começar, a segunda janela cair 100% dentro do expediente, e a terceira começar a 4h do início do dia.</p>
+    <section>
+      <h2><span class="num">§ 4</span> A intervenção</h2>
+      <h3>Acender a janela <em>antes</em> de começar.</h3>
+      <p>
+        Se um cron manda uma única mensagem de <code>ping</code> antes do seu expediente, a janela 1 fica gasta-mas-disponível quando você chega. Em uma hora ela termina, e a janela 2 começa cheia. A regra é simples:
+      </p>
+      <div class="formula">warmup = <b>início do trabalho − 4h</b></div>
+      <p>
+        Pra trabalho 09h–18h, o warmup ideal é <code>05:00</code>. A primeira janela termina às 10h, uma hora depois do início. A segunda janela cai inteira no expediente (10h–15h). A terceira começa às 15h e cobre o resto do dia. Três janelas. Três cotas frescas.
+      </p>
+    </section>
 
-    <h3>Tradeoffs honestos</h3>
-    <ul>
-      <li><strong class="inline-warn">O limite semanal continua valendo.</strong> Warmup não te dá mais cota total, só desloca quando os resets acontecem dentro do dia.</li>
-      <li>Cada warmup consome ~1 request do seu plano. Desprezível, mas existe.</li>
-      <li>Funciona melhor pra trabalho ≥ 6h. Pra jornadas curtas (≤5h), uma janela já cobre tudo.</li>
-      <li>Você precisa de uma máquina sempre ligada (server, mini PC, VPS) com o <code>claude</code> CLI instalado pra rodar o cron.</li>
-    </ul>
+    <section>
+      <h2><span class="num">§ 5</span> Os tradeoffs</h2>
+      <h3>O que isso não resolve.</h3>
+      <ol class="tradeoffs">
+        <li><b>O limite semanal continua valendo.</b> Warmup não dá mais cota; só desloca onde os resets caem no dia. Quem já bate o teto semanal não ganha nada.</li>
+        <li><b>Cada warmup consome ~1 request.</b> Desprezível, mas existe. Em 22 dias úteis, são 22 pings.</li>
+        <li><b>Só vale pra jornada ≥ 6h.</b> Em jornadas curtas, uma janela única já cobre tudo.</li>
+        <li><b>Precisa de uma máquina sempre ligada</b> com o <code>claude</code> CLI instalado e autenticado: um mini PC, um servidor de casa, uma VPS, ou seu próprio laptop com o crontab ativo o tempo todo.</li>
+      </ol>
+    </section>
 
-    <h3>Pré-requisitos pro cron</h3>
-    <ul>
-      <li>Claude Code CLI instalado e autenticado na máquina onde o cron vai rodar</li>
-      <li>Path correto do binário — descubra com <code>which claude</code> e ajuste a linha gerada se diferente</li>
-      <li>Cron habilitado (Linux/macOS) ou Task Scheduler (Windows com adaptação manual)</li>
-    </ul>
-  </div>
+    <section>
+      <h2><span class="num">§ 6</span> Pré-requisitos do cron</h2>
+      <p>
+        Claude Code CLI instalado, autenticado, no path do usuário que vai rodar o cron. Descubra o binário com <code>which claude</code>: pode estar em <code>/usr/local/bin</code>, <code>~/.local/bin</code>, ou onde o seu instalador colocou. Ajuste a linha gerada antes de colar no <code>crontab -e</code>.
+      </p>
+      <p>
+        Cron é seg-sex por padrão (<code>1-5</code>). Se você trabalha aos sábados, troque pra <code>*</code>. Se o cron está num timezone diferente, ajuste o horário manualmente: a ferramenta assume que o servidor está no mesmo fuso que o seu expediente.
+      </p>
+    </section>
 
-  <footer>
-    Feito por <a href="https://ramonmatos.com.br" target="_blank" rel="noopener">Ramon Matos</a>
-    · Sem analytics, sem cookies, sem rastreio.
-    · <a href="https://github.com/ramonmatosweb/claude-crounde" target="_blank" rel="noopener">Código no GitHub</a>
+  </article>
+
+  <footer class="colophon">
+    <div class="left">
+      <a href="https://ramonmatos.com.br" target="_blank" rel="noopener">ramonmatos.com.br</a>
+    </div>
+    <div class="right">
+      <a href="https://github.com/ramonmatosweb/claude-crounde" target="_blank" rel="noopener">source · MIT</a>
+      <span>sem analytics</span>
+    </div>
   </footer>
+
 </div>
 
 <script>
 (function(){
-  const HOUR = 60;
-  const DAY  = 24 * HOUR;
-  const WINDOW = 5 * HOUR;
-  const WARMUP_OFFSET = 4 * HOUR;
+  const HOUR  = 60;
+  const DAY   = 24 * HOUR;
+  const WIN   = 5 * HOUR;
+  const OFF   = 4 * HOUR;
 
-  function parseTime(hhmm) {
-    const [h, m] = hhmm.split(':').map(Number);
-    return h * 60 + m;
-  }
-  function pad(n) { return String(n).padStart(2, '0'); }
-  function fmtTime(mins) {
-    const m = ((mins % DAY) + DAY) % DAY;
-    return `${pad(Math.floor(m/60))}:${pad(m%60)}`;
-  }
-  function fmtDuration(mins) {
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    if (h === 0) return `${m}min`;
-    if (m === 0) return `${h}h`;
-    return `${h}h${pad(m)}`;
-  }
+  function parseTime(s){ const [h,m]=s.split(':').map(Number); return h*60+m; }
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function fmtClock(min){ const m = ((min%DAY)+DAY)%DAY; return `${pad(Math.floor(m/60))}:${pad(m%60)}`; }
+  function fmtDur(min){ const h=Math.floor(min/60), m=min%60; if(!h) return `${m}min`; if(!m) return `${h}h`; return `${h}h${pad(m)}`; }
+  const ORDINAIS = ['zero','uma','duas','três','quatro','cinco','seis'];
 
-  function calcular(startStr, endStr) {
+  function calcular(startStr, endStr){
     const startMin = parseTime(startStr);
     let endMin = parseTime(endStr);
-    if (endMin <= startMin) endMin += DAY; // overnight
+    if (endMin <= startMin) endMin += DAY;
     const workMin = endMin - startMin;
 
-    if (workMin <= WINDOW) {
-      return {
-        semWarmup: true,
-        workMin,
-        mensagem: 'Sua jornada cabe em uma janela de 5h. Warmup não traz ganho — você consegue usar uma janela inteira sem precisar de cron.'
-      };
+    if (workMin <= WIN) {
+      return { semWarmup: true, workMin, startMin, endMin };
     }
 
-    let warmupMin = ((startMin - WARMUP_OFFSET) + DAY) % DAY;
-    const wh = Math.floor(warmupMin / 60);
-    const wm = warmupMin % 60;
+    let warmupMin = ((startMin - OFF) + DAY) % DAY;
 
-    const cronLine = `${wm} ${wh} * * 1-5 /usr/local/bin/claude -p "ping" --output-format json > /tmp/claude_warmup.log 2>&1`;
+    const cronLine = {
+      field: `${warmupMin%60} ${Math.floor(warmupMin/60)} * * 1-5`,
+      path: `/usr/local/bin/claude`,
+      arg: `-p "ping" --output-format json > /tmp/claude_warmup.log 2>&1`
+    };
 
-    // gerar janelas (até 4 — basta pra cobrir até 20h de trabalho)
     const todasJanelas = [];
-    for (let i = 0; i < 4; i++) {
-      // janela i começa em warmupMin + i*5h. Pode estar antes do startMin, então normalizamos pra escala "expediente".
-      // Pra plotar, usamos coordenadas absolutas a partir de warmupMin (canto esquerdo do dia visualizado).
-      const wStart = warmupMin + i * WINDOW;
-      const wEnd   = wStart + WINDOW;
-
-      // overnight: se warmup foi ontem (warmupMin > startMin), a janela ainda usa essa coordenada
-      // pra interseção, comparamos contra [startMin, endMin] (endMin pode > 24h)
-      // mas warmupMin pode estar > startMin (caso warmup hoje cedo, ex 5h, e start hoje 9h → ok)
-      // ou warmupMin > endMin se start é cedo e overnight (ex start=2h, warmup=22h "ontem"... raro)
-      // Pra simplificar usamos uma normalização: se warmupMin > startMin, subtrai 24h (warmup foi "ontem")
-      const wsAdj = wStart > endMin ? wStart - DAY : wStart;
-      const weAdj = wsAdj + WINDOW;
-
-      const inStart = Math.max(wsAdj, startMin);
-      const inEnd   = Math.min(weAdj, endMin);
+    for (let i=0; i<4; i++){
+      const rawStart = warmupMin + i*WIN;
+      const wStart = rawStart > endMin ? rawStart - DAY : rawStart;
+      const wEnd   = wStart + WIN;
+      const inStart = Math.max(wStart, startMin);
+      const inEnd   = Math.min(wEnd, endMin);
       const inDur   = Math.max(0, inEnd - inStart);
-
-      todasJanelas.push({ i: i+1, wStart: wsAdj, wEnd: weAdj, inDur, inStart, inEnd });
+      todasJanelas.push({ i: i+1, wStart, wEnd, inDur, inStart, inEnd });
     }
-
     const noExpediente = todasJanelas.filter(j => j.inDur > 0);
 
-    return {
-      semWarmup: false,
-      workMin,
-      warmupStr: fmtTime(warmupMin),
-      warmupMin,
-      startMin,
-      endMin,
-      cronLine,
-      todasJanelas,
-      noExpediente
-    };
+    return { semWarmup: false, workMin, startMin, endMin, warmupMin, cronLine, todasJanelas, noExpediente };
   }
 
-  function renderTimeline(r) {
-    // visualizamos uma janela de 24h centrada de tal forma que mostremos warmup + todas as janelas
-    // escolhemos início da régua = min(warmupMin, startMin) - 1h
-    // fim da régua = max(...janelasEnd, endMin) + 1h
-    const candidates = [r.warmupMin, r.startMin];
-    r.todasJanelas.forEach(j => { candidates.push(j.wStart, j.wEnd); });
-    candidates.push(r.endMin);
-    const rulerStart = Math.min(...candidates) - 60;
-    const rulerEnd   = Math.max(...candidates) + 60;
-    const rulerSpan  = rulerEnd - rulerStart;
+  const $ = id => document.getElementById(id);
 
-    function pct(min) {
-      return ((min - rulerStart) / rulerSpan) * 100;
-    }
-
-    let hourMarks = '';
-    // marcar a cada 2h
-    const firstHour = Math.ceil(rulerStart / 120) * 120;
-    for (let m = firstHour; m <= rulerEnd; m += 120) {
-      const p = pct(m);
-      hourMarks += `<div class="hour-mark" style="left:${p}%"></div>`;
-      hourMarks += `<div class="hour-label" style="left:${p}%">${fmtTime(m)}</div>`;
-    }
-
-    let winBars = '';
-    r.todasJanelas.forEach(j => {
-      const left = pct(j.wStart);
-      const width = (WINDOW / rulerSpan) * 100;
-      winBars += `<div class="window-bar" style="left:${left}%;width:${width}%" title="Janela ${j.i}: ${fmtTime(j.wStart)} → ${fmtTime(j.wEnd)}">J${j.i}</div>`;
-    });
-
-    const workLeft = pct(r.startMin);
-    const workWidth = (r.workMin / rulerSpan) * 100;
-    const workBar = `<div class="work-bar" style="left:${workLeft}%;width:${workWidth}%" title="Expediente: ${fmtTime(r.startMin)} → ${fmtTime(r.endMin)}"></div>`;
-
-    return `
-      <div class="timeline-wrapper">
-        <div class="timeline-title">Visualização das janelas no seu dia</div>
-        <div class="timeline">
-          <div class="hour-marks">${hourMarks}</div>
-          ${winBars}
-          ${workBar}
-        </div>
-        <div class="legend">
-          <div class="legend-item"><span class="legend-swatch win"></span> Janela de 5h</div>
-          <div class="legend-item"><span class="legend-swatch work"></span> Seu expediente</div>
-        </div>
-      </div>
-    `;
+  function renderCronLine(c){
+    $('cron-line').innerHTML =
+      `<span class="field">${c.field}</span> ` +
+      `<span class="path">${c.path}</span> ` +
+      `<span class="arg">-p "ping" --output-format json &gt; /tmp/claude_warmup.log 2&gt;&amp;1</span>`;
   }
 
-  function renderResultado(r) {
-    const container = document.getElementById('result-content');
-    const wrap = document.getElementById('resultado');
+  function renderState(r){
+    const out = $('output');
 
-    if (r.semWarmup) {
-      container.innerHTML = `
-        <div class="warn-card">
-          <strong class="icon">ℹ️ Sem warmup necessário.</strong>
-          <p style="margin-top:8px;color:var(--text-dim);font-size:14px">${r.mensagem}</p>
-        </div>
-      `;
-      wrap.classList.add('show');
-      wrap.scrollIntoView({behavior: 'smooth', block: 'start'});
+    if (r.semWarmup){
+      out.classList.add('no-warmup');
+      $('m-start').textContent  = fmtClock(r.startMin);
+      $('m-end').textContent    = fmtClock(r.endMin);
+      $('m-warmup').textContent = '—';
+      $('m-windows').textContent = '1';
+      $('output-note').style.display = 'none';
+      $('cap-warmup').textContent = '—';
+      $('cap-windows').textContent = 'uma';
+      renderDiagram(r);
       return;
     }
 
-    const numJanelas = r.noExpediente.length;
-    const detalhes = r.noExpediente.map(j => fmtDuration(j.inDur)).join(' + ');
+    out.classList.remove('no-warmup');
+    $('output-note').style.display = '';
 
-    container.innerHTML = `
-      <div class="warmup-display">
-        <div class="label">Warmup recomendado</div>
-        <div class="time">${r.warmupStr}</div>
-        <div class="sub">Seg a sex · ${fmtDuration(WARMUP_OFFSET)} antes do início do seu trabalho</div>
-      </div>
+    $('m-start').textContent   = fmtClock(r.startMin);
+    $('m-end').textContent     = fmtClock(r.endMin);
+    $('m-warmup').textContent  = fmtClock(r.warmupMin);
+    $('m-windows').textContent = r.noExpediente.length;
+    $('m-coverage').textContent = r.noExpediente.map(j => fmtDur(j.inDur)).join(' + ');
 
-      <div class="label-line">Linha de cron (cole no <code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px">crontab -e</code>)</div>
-      <div class="code-block">
-        <div class="content" id="cron-content">${r.cronLine}</div>
-        <button class="copy-btn" data-target="cron-content">Copiar</button>
-      </div>
+    renderCronLine(r.cronLine);
 
-      ${renderTimeline(r)}
+    $('cap-warmup').textContent  = fmtClock(r.warmupMin);
+    $('cap-windows').textContent = ORDINAIS[r.noExpediente.length] || String(r.noExpediente.length);
 
-      <div class="summary">
-        ✨ Com esse warmup, você acessa <strong>${numJanelas} janela${numJanelas > 1 ? 's' : ''}</strong> durante o expediente (${detalhes}).
-      </div>
-
-      <p style="margin-top:20px;font-size:13px;color:var(--text-dim);line-height:1.5">
-        ⚠️ Ajuste o path <code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px">/usr/local/bin/claude</code> se o seu binário estiver em outro lugar — descubra com <code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px">which claude</code>.
-      </p>
-    `;
-    wrap.classList.add('show');
-
-    // bind copy buttons
-    container.querySelectorAll('.copy-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const targetId = btn.getAttribute('data-target');
-        const text = document.getElementById(targetId).textContent;
-        try {
-          await navigator.clipboard.writeText(text);
-          const orig = btn.textContent;
-          btn.textContent = 'Copiado ✓';
-          btn.classList.add('ok');
-          setTimeout(() => { btn.textContent = orig; btn.classList.remove('ok'); }, 1800);
-        } catch(e) {
-          btn.textContent = 'Erro';
-          setTimeout(() => { btn.textContent = 'Copiar'; }, 1800);
-        }
-      });
-    });
-
-    wrap.scrollIntoView({behavior: 'smooth', block: 'start'});
+    renderDiagram(r);
   }
 
-  document.getElementById('calcular').addEventListener('click', () => {
-    const s = document.getElementById('start').value || '09:00';
-    const e = document.getElementById('end').value || '18:00';
-    const r = calcular(s, e);
-    renderResultado(r);
-  });
+  function renderDiagram(r){
+    const W = 800, H = 180;
+    const padL = 24, padR = 24, padT = 36, padB = 30;
+    const innerW = W - padL - padR;
 
-  // calcular automaticamente no carregamento com os defaults
-  window.addEventListener('DOMContentLoaded', () => {
-    const r = calcular('09:00', '18:00');
-    renderResultado(r);
-    // mas remover o auto-scroll inicial
-    setTimeout(() => window.scrollTo({top: 0}), 50);
-  });
+    const cands = [r.startMin, r.endMin];
+    if (!r.semWarmup) {
+      r.todasJanelas.forEach(j => { cands.push(j.wStart, j.wEnd); });
+      cands.push(r.warmupMin);
+    }
+    const rStart = Math.min(...cands) - 30;
+    const rEnd   = Math.max(...cands) + 30;
+    const rSpan  = rEnd - rStart;
+    const x = m => padL + ((m - rStart)/rSpan)*innerW;
+
+    const winY  = padT + 2;
+    const winH  = 40;
+    const workY = winY + winH + 18;
+    const workH = 22;
+    const axisY = workY + workH + 14;
+
+    let parts = [];
+    parts.push(`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Diagrama das janelas de 5h e expediente">`);
+
+    parts.push(`<defs>
+      <pattern id="hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+        <line x1="0" y1="0" x2="0" y2="6" stroke="oklch(22% 0.025 50)" stroke-width="0.5" stroke-opacity="0.35"/>
+      </pattern>
+    </defs>`);
+
+    // axis baseline
+    parts.push(`<line class="axis-line" x1="${padL}" y1="${axisY}" x2="${W - padR}" y2="${axisY}"/>`);
+
+    // hour ticks
+    const firstFullHour = Math.ceil(rStart / 60) * 60;
+    for (let m = firstFullHour; m <= rEnd; m += 60) {
+      const isMajor = m % 120 === 0;
+      const tx = x(m);
+      parts.push(`<line class="${isMajor ? 'axis-tick' : 'axis-tick-min'}" x1="${tx}" y1="${axisY}" x2="${tx}" y2="${axisY + (isMajor ? 6 : 3)}"/>`);
+      if (isMajor) {
+        parts.push(`<text class="axis-label" x="${tx}" y="${axisY + 17}" text-anchor="middle">${fmtClock(m)}</text>`);
+      }
+    }
+
+    // window bands
+    if (!r.semWarmup) {
+      r.todasJanelas.forEach(j => {
+        const wx = x(j.wStart);
+        const ww = x(j.wEnd) - wx;
+        const isFuture = j.inDur === 0;
+        parts.push(`<rect class="window-band${isFuture ? ' future' : ''}" x="${wx}" y="${winY}" width="${ww}" height="${winH}"/>`);
+        if (ww > 36) {
+          parts.push(`<text class="window-label${isFuture ? ' future' : ''}" x="${wx + ww/2}" y="${winY + winH/2 + 4}">JANELA ${j.i}</text>`);
+        }
+        // reset tick at end of each window if within view
+        if (j.wEnd <= rEnd && j.wEnd >= rStart) {
+          parts.push(`<g class="reset-marker">
+            <line x1="${x(j.wEnd)}" y1="${winY - 4}" x2="${x(j.wEnd)}" y2="${workY + workH + 4}"/>
+          </g>`);
+        }
+      });
+    } else {
+      const wx = x(r.startMin);
+      const ww = x(r.startMin + WIN) - wx;
+      parts.push(`<rect class="window-band" x="${wx}" y="${winY}" width="${ww}" height="${winH}"/>`);
+      parts.push(`<text class="window-label" x="${wx + ww/2}" y="${winY + winH/2 + 4}">JANELA 1</text>`);
+    }
+
+    // work band
+    const wkx = x(r.startMin);
+    const wkw = x(r.endMin) - wkx;
+    parts.push(`<rect class="work-band" x="${wkx}" y="${workY}" width="${wkw}" height="${workH}"/>`);
+    parts.push(`<rect x="${wkx}" y="${workY}" width="${wkw}" height="${workH}" fill="url(#hatch)"/>`);
+    parts.push(`<text class="work-label" x="${wkx + 8}" y="${workY - 6}">EXPEDIENTE ${fmtClock(r.startMin)} → ${fmtClock(r.endMin)}</text>`);
+
+    // warmup marker
+    if (!r.semWarmup) {
+      const wmx = x(r.warmupMin);
+      parts.push(`<g class="warmup-marker">
+        <line x1="${wmx}" y1="${winY - 14}" x2="${wmx}" y2="${axisY}"/>
+        <text x="${wmx}" y="${winY - 18}">↓ warmup ${fmtClock(r.warmupMin)}</text>
+      </g>`);
+    }
+
+    parts.push(`</svg>`);
+    $('diagram-wrap').innerHTML = parts.join('');
+  }
+
+  function bindCopy(){
+    const btn = $('copy-btn');
+    btn.addEventListener('click', async () => {
+      const txt = $('cron-line').textContent;
+      try {
+        await navigator.clipboard.writeText(txt);
+        const orig = btn.textContent;
+        btn.textContent = 'Copiado';
+        btn.classList.add('ok');
+        setTimeout(() => { btn.textContent = orig; btn.classList.remove('ok'); }, 1800);
+      } catch(e) {
+        btn.textContent = 'Erro';
+        setTimeout(() => { btn.textContent = 'Copiar'; }, 1800);
+      }
+    });
+  }
+
+  function calculate(){
+    const s = $('start').value || '09:00';
+    const e = $('end').value || '18:00';
+    const r = calcular(s, e);
+    renderState(r);
+    const line = $('cron-line');
+    line.classList.remove('flash');
+    void line.offsetWidth;
+    line.classList.add('flash');
+  }
+
+  $('calcular').addEventListener('click', calculate);
+  $('start').addEventListener('change', calculate);
+  $('end').addEventListener('change', calculate);
+
+  bindCopy();
+  calculate();
 })();
 </script>
 </body>
