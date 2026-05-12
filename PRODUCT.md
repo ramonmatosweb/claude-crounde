@@ -60,6 +60,7 @@ What it can resemble (positive references):
 - Single `index.html`. No build step. Inline CSS + JS.
 - Google Fonts allowed (one or two faces, max).
 - pt-BR copy. Numbers and code stay universal.
+- **Dark mode only.** Maintainer (Ramon) has visual sensitivity and works in dark environments. The "warm dark" palette (near-black warm-brown background + cream text + terracota accent) is the committed direction. Do NOT add a light-mode toggle. Do NOT propose light mode as the default.
 - Deploy: Vercel (already wired). DNS: Cloudflare (already wired).
 - License: MIT (already in repo).
 - Existing JS logic is correct — preserve all calculation behavior, only change presentation and bindings.

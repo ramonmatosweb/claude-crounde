@@ -8,21 +8,23 @@
 <meta property="og:title" content="claude-crounde">
 <meta property="og:description" content="Empurre o reset da janela de 5h do Claude Code pra dentro do expediente. Gerador de cron determinístico.">
 <meta property="og:type" content="website">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23f1ede2'/%3E%3Ctext x='32' y='44' font-family='Georgia,serif' font-size='40' text-anchor='middle' fill='%23c95d2c' font-weight='700'%3E%E2%97%B7%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%231a1410'/%3E%3Ctext x='32' y='44' font-family='Georgia,serif' font-size='40' text-anchor='middle' fill='%23d9885a' font-weight='700'%3E%E2%97%B7%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --paper:       oklch(96% 0.012 80);
-    --paper-edge:  oklch(92% 0.018 75);
-    --ink:         oklch(22% 0.025 50);
-    --ink-soft:    oklch(45% 0.025 50);
-    --ink-faint:   oklch(62% 0.020 55);
-    --rule:        oklch(82% 0.015 70);
-    --accent:      oklch(55% 0.15 40);
-    --accent-deep: oklch(42% 0.14 38);
-    --accent-soft: oklch(88% 0.05 40);
+    /* Dark warm — inspired by analog studios at night, not "SaaS dark mode".
+       Background tinted toward warm earth (orange-brown), never blue-grey. */
+    --paper:       oklch(16% 0.014 50);   /* near-black, warm */
+    --paper-edge:  oklch(20% 0.016 50);   /* slight elevation */
+    --ink:         oklch(89% 0.014 85);   /* warm cream text */
+    --ink-soft:    oklch(70% 0.018 75);
+    --ink-faint:   oklch(54% 0.018 65);
+    --rule:        oklch(30% 0.020 55);
+    --accent:      oklch(68% 0.14 42);    /* terracota lit up for dark bg */
+    --accent-deep: oklch(78% 0.12 40);
+    --accent-soft: oklch(28% 0.06 40);
 
     --measure: 68ch;
     --col-max: 720px;
@@ -36,9 +38,11 @@
     color: var(--ink);
     font-family: 'Source Serif 4', Georgia, 'Iowan Old Style', serif;
     font-size: clamp(16px, 0.92rem + 0.25vw, 18px);
-    line-height: 1.55;
+    /* Light text on dark needs more breathing room than 1.55 */
+    line-height: 1.62;
     font-feature-settings: "kern", "liga", "onum";
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
   ::selection { background: var(--accent-soft); color: var(--ink); }
@@ -340,31 +344,32 @@
   }
   .diagram-svg-wrap svg { display: block; width: 100%; height: auto; max-height: 220px; }
 
-  /* SVG element styles via CSS so they pick up tokens */
-  .axis-line     { stroke: oklch(22% 0.025 50); stroke-width: 1; }
-  .axis-tick     { stroke: oklch(22% 0.025 50); stroke-width: 1; }
-  .axis-tick-min { stroke: oklch(62% 0.020 55); stroke-width: 0.5; }
+  /* SVG element styles use CSS vars so they invert with theme */
+  .hatch-line    { stroke: var(--ink); stroke-width: 0.5; stroke-opacity: 0.3; }
+  .axis-line     { stroke: var(--ink); stroke-width: 1; }
+  .axis-tick     { stroke: var(--ink); stroke-width: 1; }
+  .axis-tick-min { stroke: var(--ink-faint); stroke-width: 0.5; }
   .axis-label {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-size: 10px;
-    fill: oklch(45% 0.025 50);
+    fill: var(--ink-soft);
     font-variant-numeric: tabular-nums;
   }
   .window-band {
-    fill: oklch(55% 0.15 40);
-    fill-opacity: 0.10;
-    stroke: oklch(55% 0.15 40);
+    fill: var(--accent);
+    fill-opacity: 0.16;
+    stroke: var(--accent);
     stroke-width: 1;
   }
   .window-band.future {
-    fill-opacity: 0.03;
+    fill-opacity: 0.05;
     stroke-dasharray: 3 2;
     stroke-opacity: 0.55;
   }
   .window-label {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-size: 10px;
-    fill: oklch(42% 0.14 38);
+    fill: var(--accent-deep);
     font-weight: 600;
     text-anchor: middle;
     letter-spacing: 0.05em;
@@ -372,29 +377,29 @@
   .window-label.future { fill-opacity: 0.55; }
   .work-band {
     fill: none;
-    stroke: oklch(22% 0.025 50);
+    stroke: var(--ink);
     stroke-width: 1.2;
   }
   .work-label {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-size: 10.5px;
-    fill: oklch(22% 0.025 50);
+    fill: var(--ink);
     font-weight: 600;
     letter-spacing: 0.06em;
   }
-  .reset-marker line { stroke: oklch(42% 0.14 38); stroke-width: 1; stroke-dasharray: 1.5 2; }
+  .reset-marker line { stroke: var(--accent-deep); stroke-width: 1; stroke-dasharray: 1.5 2; }
   .reset-marker text {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-size: 9px;
-    fill: oklch(42% 0.14 38);
+    fill: var(--accent-deep);
     text-anchor: middle;
     letter-spacing: 0.04em;
   }
-  .warmup-marker line { stroke: oklch(42% 0.14 38); stroke-width: 1.2; stroke-dasharray: 2 2; }
+  .warmup-marker line { stroke: var(--accent-deep); stroke-width: 1.2; stroke-dasharray: 2 2; }
   .warmup-marker text {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-size: 10px;
-    fill: oklch(42% 0.14 38);
+    fill: var(--accent-deep);
     text-anchor: middle;
     font-weight: 600;
     letter-spacing: 0.05em;
@@ -779,7 +784,7 @@
 
     parts.push(`<defs>
       <pattern id="hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
-        <line x1="0" y1="0" x2="0" y2="6" stroke="oklch(22% 0.025 50)" stroke-width="0.5" stroke-opacity="0.35"/>
+        <line x1="0" y1="0" x2="0" y2="6" class="hatch-line"/>
       </pattern>
     </defs>`);
 
